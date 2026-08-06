@@ -10,11 +10,18 @@ jobs:
   build:
     runs-on: windows-2022
 
+    env:
+      PACKAGES_PATH: ${{ github.workspace }}\edk2;${{ github.workspace }}
+
     defaults:
       run:
         shell: cmd
 
     steps:
+
+    ###########################################################################
+    # Checkout
+    ###########################################################################
 
     - name: Checkout PIXEL-OS
       uses: actions/checkout@v4
@@ -25,6 +32,11 @@ jobs:
         repository: tianocore/edk2
         path: edk2
         submodules: recursive
+        fetch-depth: 0
+
+    ###########################################################################
+    # Python
+    ###########################################################################
 
     - name: Setup Python
       uses: actions/setup-python@v5
@@ -37,114 +49,149 @@ jobs:
         python -m pip install --upgrade pip
         python -m pip install -r pip-requirements.txt
 
-    - name: Setup Visual Studio
+    ###########################################################################
+    # Visual Studio
+    ###########################################################################
+
+    - name: Setup MSVC
       uses: ilammy/msvc-dev-cmd@v1
       with:
         arch: x64
+
+    ###########################################################################
+    # BaseTools
+    ###########################################################################
 
     - name: Build BaseTools
       working-directory: edk2
       run: |
         python BaseTools\Edk2ToolsBuild.py -t VS2022
 
+    ###########################################################################
+    # Configure Workspace
+    ###########################################################################
+
     - name: Configure Workspace
       working-directory: edk2
       run: |
         call edksetup.bat Rebuild
-        set PACKAGES_PATH=%CD%;..
 
-    #####################################################################
-    ## EVERYTHING BELOW IS PURE DEBUGGING
-    #####################################################################
+    ###########################################################################
+    # DEBUG EVERYTHING
+    ###########################################################################
 
     - name: Debug Environment
       working-directory: edk2
       continue-on-error: true
       run: |
 
-        echo ========================================
+        echo ==================================================
         echo WORKSPACE
-        echo ========================================
+        echo ==================================================
         echo %WORKSPACE%
 
         echo.
-        echo ========================================
+        echo ==================================================
         echo PACKAGES_PATH
-        echo ========================================
+        echo ==================================================
         echo %PACKAGES_PATH%
 
         echo.
-        echo ========================================
-        echo BUILD
-        echo ========================================
+        echo ==================================================
+        echo BUILD COMMAND
+        echo ==================================================
         where build
 
         echo.
-        echo ========================================
+        echo ==================================================
         echo BUILD.EXE
-        echo ========================================
+        echo ==================================================
         dir /s build.exe
 
         echo.
-        echo ========================================
+        echo ==================================================
         echo BaseTools Bin
-        echo ========================================
+        echo ==================================================
         dir BaseTools\Bin /s
 
         echo.
-        echo ========================================
+        echo ==================================================
         echo Python Build
-        echo ========================================
+        echo ==================================================
         dir BaseTools\Source\Python\build /s
 
         echo.
-        echo ========================================
-        echo MdePkg Libraries
-        echo ========================================
+        echo ==================================================
+        echo MdePkg
+        echo ==================================================
+        dir MdePkg
+
+        echo.
+        echo ==================================================
+        echo MdePkg Library
+        echo ==================================================
         dir MdePkg\Library
 
         echo.
-        echo ========================================
-        echo MdeModulePkg Libraries
-        echo ========================================
-        dir MdeModulePkg\Library
+        echo ==================================================
+        echo MemoryAllocationLib
+        echo ==================================================
+        if exist MdePkg\Library\MemoryAllocationLib\MemoryAllocationLib.inf (
+          echo FOUND
+        ) else (
+          echo NOT FOUND
+        )
+
+        dir /s MdePkg\Library\MemoryAllocationLib
 
         echo.
-        echo ========================================
+        echo ==================================================
+        echo MdeModulePkg
+        echo ==================================================
+        dir MdeModulePkg
+
+        echo.
+        echo ==================================================
         echo PixelBootPkg
-        echo ========================================
+        echo ==================================================
         dir ..\PixelBootPkg /s
 
         echo.
-        echo ========================================
-        echo DSC
-        echo ========================================
+        echo ==================================================
+        echo PixelBoot.dsc
+        echo ==================================================
         type ..\PixelBootPkg\PixelBoot.dsc
 
         echo.
-        echo ========================================
-        echo INF
-        echo ========================================
+        echo ==================================================
+        echo PixelBoot.inf
+        echo ==================================================
         type ..\PixelBootPkg\PixelBoot.inf
 
-    #####################################################################
+    ###########################################################################
+    # Build
+    ###########################################################################
 
     - name: Build PIXEL
       working-directory: edk2
       run: |
         call edksetup.bat Rebuild
-        set PACKAGES_PATH=%CD%;..
+
         build ^
           -a X64 ^
           -b DEBUG ^
           -t VS2022 ^
           -p ..\PixelBootPkg\PixelBoot.dsc
 
-    - name: Upload Logs
+    ###########################################################################
+    # Upload Everything
+    ###########################################################################
+
+    - name: Upload Build Output
       if: always()
       uses: actions/upload-artifact@v4
       with:
-        name: debug
+        name: PIXEL-Debug
         path: |
           edk2/Build
           edk2/Conf
