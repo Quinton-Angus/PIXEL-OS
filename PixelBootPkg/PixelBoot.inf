@@ -11,7 +11,9 @@
 
 [Packages]
   MdePkg/MdePkg.dec
+  MdeModulePkg/MdeModulePkg.dec
 
 [LibraryClasses]
   UefiApplicationEntryPoint
   UefiLib
+  PcdLib
