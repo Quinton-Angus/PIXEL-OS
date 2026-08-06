@@ -1,27 +1,22 @@
-name: Build PIXEL OS (Debug)
+name: Build PIXEL OS
 
 on:
-  workflow_dispatch:
   push:
-    branches:
-      - main
+    branches: [ main ]
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: windows-2022
 
-    env:
-      PACKAGES_PATH: ${{ github.workspace }}\edk2;${{ github.workspace }}
-
     defaults:
       run:
         shell: cmd
 
-    steps:
+    env:
+      PACKAGES_PATH: ${{ github.workspace }}\edk2
 
-    ###########################################################################
-    # Checkout
-    ###########################################################################
+    steps:
 
     - name: Checkout PIXEL-OS
       uses: actions/checkout@v4
@@ -34,10 +29,6 @@ jobs:
         submodules: recursive
         fetch-depth: 0
 
-    ###########################################################################
-    # Python
-    ###########################################################################
-
     - name: Setup Python
       uses: actions/setup-python@v5
       with:
@@ -49,130 +40,33 @@ jobs:
         python -m pip install --upgrade pip
         python -m pip install -r pip-requirements.txt
 
-    ###########################################################################
-    # Visual Studio
-    ###########################################################################
-
     - name: Setup MSVC
       uses: ilammy/msvc-dev-cmd@v1
       with:
         arch: x64
-
-    ###########################################################################
-    # BaseTools
-    ###########################################################################
 
     - name: Build BaseTools
       working-directory: edk2
       run: |
         python BaseTools\Edk2ToolsBuild.py -t VS2022
 
-    ###########################################################################
-    # Configure Workspace
-    ###########################################################################
-
-    - name: Configure Workspace
+    - name: Configure EDK II
       working-directory: edk2
       run: |
         call edksetup.bat Rebuild
 
-    ###########################################################################
-    # DEBUG EVERYTHING
-    ###########################################################################
-
-    - name: Debug Environment
-      working-directory: edk2
-      continue-on-error: true
+    - name: Copy PixelBootPkg
       run: |
+        xcopy PixelBootPkg edk2\PixelBootPkg /E /I /Y
 
-        echo ==================================================
-        echo WORKSPACE
-        echo ==================================================
-        echo %WORKSPACE%
+    - name: Register PixelBoot
+      working-directory: edk2
+      run: |
+        echo.>>MdeModulePkg\MdeModulePkg.dsc
+        echo # PIXEL OS>>MdeModulePkg\MdeModulePkg.dsc
+        echo PixelBootPkg/PixelBoot.inf>>MdeModulePkg\MdeModulePkg.dsc
 
-        echo.
-        echo ==================================================
-        echo PACKAGES_PATH
-        echo ==================================================
-        echo %PACKAGES_PATH%
-
-        echo.
-        echo ==================================================
-        echo BUILD COMMAND
-        echo ==================================================
-        where build
-
-        echo.
-        echo ==================================================
-        echo BUILD.EXE
-        echo ==================================================
-        dir /s build.exe
-
-        echo.
-        echo ==================================================
-        echo BaseTools Bin
-        echo ==================================================
-        dir BaseTools\Bin /s
-
-        echo.
-        echo ==================================================
-        echo Python Build
-        echo ==================================================
-        dir BaseTools\Source\Python\build /s
-
-        echo.
-        echo ==================================================
-        echo MdePkg
-        echo ==================================================
-        dir MdePkg
-
-        echo.
-        echo ==================================================
-        echo MdePkg Library
-        echo ==================================================
-        dir MdePkg\Library
-
-        echo.
-        echo ==================================================
-        echo MemoryAllocationLib
-        echo ==================================================
-        if exist MdePkg\Library\MemoryAllocationLib\MemoryAllocationLib.inf (
-          echo FOUND
-        ) else (
-          echo NOT FOUND
-        )
-
-        dir /s MdePkg\Library\MemoryAllocationLib
-
-        echo.
-        echo ==================================================
-        echo MdeModulePkg
-        echo ==================================================
-        dir MdeModulePkg
-
-        echo.
-        echo ==================================================
-        echo PixelBootPkg
-        echo ==================================================
-        dir ..\PixelBootPkg /s
-
-        echo.
-        echo ==================================================
-        echo PixelBoot.dsc
-        echo ==================================================
-        type ..\PixelBootPkg\PixelBoot.dsc
-
-        echo.
-        echo ==================================================
-        echo PixelBoot.inf
-        echo ==================================================
-        type ..\PixelBootPkg\PixelBoot.inf
-
-    ###########################################################################
-    # Build
-    ###########################################################################
-
-    - name: Build PIXEL
+    - name: Build
       working-directory: edk2
       run: |
         call edksetup.bat Rebuild
@@ -181,17 +75,19 @@ jobs:
           -a X64 ^
           -b DEBUG ^
           -t VS2022 ^
-          -p ..\PixelBootPkg\PixelBoot.dsc
+          -p MdeModulePkg\MdeModulePkg.dsc
 
-    ###########################################################################
-    # Upload Everything
-    ###########################################################################
+    - name: Collect EFI Files
+      run: |
+        mkdir artifact
 
-    - name: Upload Build Output
-      if: always()
+        for /r edk2\Build %%f in (*.efi) do (
+          echo Found %%f
+          copy "%%f" artifact\
+        )
+
+    - name: Upload EFI
       uses: actions/upload-artifact@v4
       with:
-        name: PIXEL-Debug
-        path: |
-          edk2/Build
-          edk2/Conf
+        name: PIXEL-EFI
+        path: artifact
