@@ -1,10 +1,10 @@
-name: Build PIXEL OS
+name: Build PIXEL OS (Debug)
 
 on:
-  push:
-    branches: [ main ]
-  pull_request:
   workflow_dispatch:
+  push:
+    branches:
+      - main
 
 jobs:
   build:
@@ -31,13 +31,10 @@ jobs:
       with:
         python-version: "3.12"
 
-    - name: Upgrade pip
-      run: |
-        python -m pip install --upgrade pip
-
-    - name: Install EDK II Python dependencies
+    - name: Install Python Requirements
       working-directory: edk2
       run: |
+        python -m pip install --upgrade pip
         python -m pip install -r pip-requirements.txt
 
     - name: Setup Visual Studio
@@ -50,49 +47,85 @@ jobs:
       run: |
         python BaseTools\Edk2ToolsBuild.py -t VS2022
 
-    - name: Setup EDK II Workspace
+    - name: Configure Workspace
       working-directory: edk2
       run: |
         call edksetup.bat Rebuild
         set PACKAGES_PATH=%CD%;..
 
     #####################################################################
-    # DEBUG INFORMATION
+    ## EVERYTHING BELOW IS PURE DEBUGGING
     #####################################################################
 
-    - name: Debug EDK II
+    - name: Debug Environment
       working-directory: edk2
       continue-on-error: true
       run: |
 
-        echo ==========================================
-        echo PATH
-        echo ==========================================
-        echo %PATH%
+        echo ========================================
+        echo WORKSPACE
+        echo ========================================
+        echo %WORKSPACE%
 
         echo.
-        echo ==========================================
-        echo BUILD COMMAND
-        echo ==========================================
+        echo ========================================
+        echo PACKAGES_PATH
+        echo ========================================
+        echo %PACKAGES_PATH%
+
+        echo.
+        echo ========================================
+        echo BUILD
+        echo ========================================
         where build
 
         echo.
-        echo ==========================================
+        echo ========================================
         echo BUILD.EXE
-        echo ==========================================
+        echo ========================================
         dir /s build.exe
 
         echo.
-        echo ==========================================
-        echo PYTHON BUILD
-        echo ==========================================
+        echo ========================================
+        echo BaseTools Bin
+        echo ========================================
+        dir BaseTools\Bin /s
+
+        echo.
+        echo ========================================
+        echo Python Build
+        echo ========================================
         dir BaseTools\Source\Python\build /s
 
         echo.
-        echo ==========================================
-        echo BIN
-        echo ==========================================
-        dir BaseTools\Bin /s
+        echo ========================================
+        echo MdePkg Libraries
+        echo ========================================
+        dir MdePkg\Library
+
+        echo.
+        echo ========================================
+        echo MdeModulePkg Libraries
+        echo ========================================
+        dir MdeModulePkg\Library
+
+        echo.
+        echo ========================================
+        echo PixelBootPkg
+        echo ========================================
+        dir ..\PixelBootPkg /s
+
+        echo.
+        echo ========================================
+        echo DSC
+        echo ========================================
+        type ..\PixelBootPkg\PixelBoot.dsc
+
+        echo.
+        echo ========================================
+        echo INF
+        echo ========================================
+        type ..\PixelBootPkg\PixelBoot.inf
 
     #####################################################################
 
@@ -107,18 +140,11 @@ jobs:
           -t VS2022 ^
           -p ..\PixelBootPkg\PixelBoot.dsc
 
-    - name: Locate EFI
-      run: |
-
-        mkdir artifact
-
-        for /r edk2\Build %%f in (*.efi) do (
-            echo Found %%f
-            copy "%%f" artifact\
-        )
-
-    - name: Upload EFI
+    - name: Upload Logs
+      if: always()
       uses: actions/upload-artifact@v4
       with:
-        name: PIXEL-EFI
-        path: artifact
+        name: debug
+        path: |
+          edk2/Build
+          edk2/Conf
