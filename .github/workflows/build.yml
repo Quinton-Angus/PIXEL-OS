@@ -1,4 +1,4 @@
-name: Build PIXEL OS
+name: Build PIXEL EFI
 
 on:
   push:
@@ -7,50 +7,72 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-efi:
-    runs-on: windows-2022
+  build:
+    runs-on: windows-latest
 
     steps:
-      - name: Checkout PIXEL OS
+      - name: Checkout PIXEL
+        uses: actions/checkout@v4
+
+      - name: Checkout EDK II
         uses: actions/checkout@v4
         with:
+          repository: tianocore/edk2
+          path: edk2
           submodules: recursive
 
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: "3.12"
 
-      - name: Prepare EDK II
+      - name: Install Python requirements
         shell: cmd
         run: |
-          git clone --depth 1 https://github.com/tianocore/edk2.git edk2
           cd edk2
-          git submodule update --init --recursive
           python -m pip install --upgrade pip
           python -m pip install -r pip-requirements.txt
-          set VS2026_PREFIX=%VCToolsInstallDir%
-          call edksetup.bat
-          python BaseTools\Edk2ToolsBuild.py -t VS2026
 
-      - name: Build PIXEL EFI
+      - name: Setup Visual Studio 2022
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Build BaseTools
         shell: cmd
         run: |
           cd edk2
-          set VS2026_PREFIX=%VCToolsInstallDir%
-          call edksetup.bat
-          set PACKAGES_PATH=%CD%;%CD%\..
-          set EDK_TOOLS_PATH=%CD%\BaseTools
-          build -p ..\PixelBootPkg\PixelBoot.dsc -a X64 -t VS2026 -b RELEASE
+          python BaseTools\Edk2ToolsBuild.py -t VS2022
 
-      - name: Package EFI artifact
+      - name: Configure EDK II
         shell: cmd
         run: |
-          mkdir artifact\EFI\BOOT
-          copy /Y edk2\Build\PixelBoot\RELEASE_VS2026\X64\PixelBootPkg\RELEASE\PixelBoot.efi artifact\EFI\BOOT\BOOTX64.EFI
+          cd edk2
+          call edksetup.bat Rebuild
 
-      - name: Upload artifact
+      - name: Copy PIXEL package
+        shell: cmd
+        run: |
+          xcopy PixelBootPkg edk2\PixelBootPkg /E /I /Y
+
+      - name: Build PIXEL
+        shell: cmd
+        run: |
+          cd edk2
+          build ^
+            -a X64 ^
+            -b DEBUG ^
+            -t VS2022 ^
+            -p PixelBootPkg\PixelBoot.dsc
+
+      - name: Collect EFI
+        shell: cmd
+        run: |
+          mkdir artifact
+          for /r edk2\Build %%f in (BOOTX64.EFI) do copy "%%f" artifact\BOOTX64.EFI
+
+      - name: Upload EFI
         uses: actions/upload-artifact@v4
         with:
-          name: PIXEL-OS-Bootloader
+          name: PIXEL-EFI
           path: artifact
