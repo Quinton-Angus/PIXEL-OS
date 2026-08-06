@@ -1,0 +1,65 @@
+name: Build PIXEL OS
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build-efi:
+    runs-on: windows-2022
+
+    steps:
+      - name: Checkout PIXEL OS
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Python dependencies
+        shell: cmd
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install edk2toolext
+
+      - name: Build BaseTools
+        shell: cmd
+        working-directory: edk2
+        run: |
+          call edksetup.bat
+          set VS2026_PREFIX=%VCToolsInstallDir%
+          python BaseTools\Edk2ToolsBuild.py -t VS2026
+
+      - name: Configure EDK2 workspace
+        shell: cmd
+        run: |
+          set PIXEL_ROOT=%CD%
+          echo PIXEL_ROOT=%PIXEL_ROOT%>> %GITHUB_ENV%
+          echo PACKAGES_PATH=%PIXEL_ROOT%;%PIXEL_ROOT%\edk2>> %GITHUB_ENV%
+          echo EDK_TOOLS_PATH=%PIXEL_ROOT%\edk2\BaseTools>> %GITHUB_ENV%
+          echo VS2026_PREFIX=%VCToolsInstallDir%>> %GITHUB_ENV%
+
+      - name: Build PIXEL EFI
+        shell: cmd
+        run: |
+          call "%PIXEL_ROOT%\edk2\edksetup.bat"
+          set PACKAGES_PATH=%PIXEL_ROOT%;%PIXEL_ROOT%\edk2
+          set VS2026_PREFIX=%VCToolsInstallDir%
+          build -p PixelBootPkg\PixelBoot.dsc -a X64 -t VS2026 -b RELEASE
+
+      - name: Package EFI artifact
+        shell: cmd
+        run: |
+          mkdir artifact\EFI\BOOT
+          copy /Y Build\PixelBoot\RELEASE_VS2026\X64\PixelBoot.efi artifact\EFI\BOOT\BOOTX64.EFI
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: PIXEL-OS-Bootloader
+          path: artifact
