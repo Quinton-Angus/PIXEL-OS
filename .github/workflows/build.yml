@@ -15,60 +15,110 @@ jobs:
         shell: cmd
 
     steps:
-      - name: Checkout PIXEL-OS
-        uses: actions/checkout@v4
 
-      - name: Checkout EDK II
-        uses: actions/checkout@v4
-        with:
-          repository: tianocore/edk2
-          path: edk2
-          submodules: recursive
+    - name: Checkout PIXEL-OS
+      uses: actions/checkout@v4
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
+    - name: Checkout EDK II
+      uses: actions/checkout@v4
+      with:
+        repository: tianocore/edk2
+        path: edk2
+        submodules: recursive
 
-      - name: Install Python dependencies
-        run: |
-          cd edk2
-          python -m pip install --upgrade pip
-          python -m pip install -r pip-requirements.txt
+    - name: Setup Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
 
-      - name: Setup MSVC
-        uses: ilammy/msvc-dev-cmd@v1
-        with:
-          arch: x64
+    - name: Upgrade pip
+      run: |
+        python -m pip install --upgrade pip
 
-      - name: Build BaseTools
-        run: |
-          cd edk2
-          python BaseTools\Edk2ToolsBuild.py -t VS2022
+    - name: Install EDK II Python dependencies
+      working-directory: edk2
+      run: |
+        python -m pip install -r pip-requirements.txt
 
-      - name: Configure EDK II
-        run: |
-          cd edk2
-          call edksetup.bat Rebuild
+    - name: Setup Visual Studio
+      uses: ilammy/msvc-dev-cmd@v1
+      with:
+        arch: x64
 
-      - name: Copy PIXEL Package
-        run: |
-          xcopy PixelBootPkg edk2\PixelBootPkg /E /I /Y
+    - name: Build BaseTools
+      working-directory: edk2
+      run: |
+        python BaseTools\Edk2ToolsBuild.py -t VS2022
 
-      - name: Build PIXEL
-        run: |
-          cd edk2
-          build -a X64 -b DEBUG -t VS2022 -p PixelBootPkg\PixelBoot.dsc
+    - name: Setup EDK II Workspace
+      working-directory: edk2
+      run: |
+        call edksetup.bat Rebuild
+        set PACKAGES_PATH=%CD%;..
 
-      - name: Find BOOTX64.EFI
-        run: |
-          mkdir artifact
-          for /r edk2\Build %%f in (BOOTX64.EFI) do (
-            copy "%%f" artifact\BOOTX64.EFI
-          )
+    #####################################################################
+    # DEBUG INFORMATION
+    #####################################################################
 
-      - name: Upload Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: PIXEL-EFI
-          path: artifact
+    - name: Debug EDK II
+      working-directory: edk2
+      continue-on-error: true
+      run: |
+
+        echo ==========================================
+        echo PATH
+        echo ==========================================
+        echo %PATH%
+
+        echo.
+        echo ==========================================
+        echo BUILD COMMAND
+        echo ==========================================
+        where build
+
+        echo.
+        echo ==========================================
+        echo BUILD.EXE
+        echo ==========================================
+        dir /s build.exe
+
+        echo.
+        echo ==========================================
+        echo PYTHON BUILD
+        echo ==========================================
+        dir BaseTools\Source\Python\build /s
+
+        echo.
+        echo ==========================================
+        echo BIN
+        echo ==========================================
+        dir BaseTools\Bin /s
+
+    #####################################################################
+
+    - name: Build PIXEL
+      working-directory: edk2
+      run: |
+        call edksetup.bat Rebuild
+        set PACKAGES_PATH=%CD%;..
+        build ^
+          -a X64 ^
+          -b DEBUG ^
+          -t VS2022 ^
+          -p ..\PixelBootPkg\PixelBoot.dsc
+
+    - name: Locate EFI
+      run: |
+
+        mkdir artifact
+
+        for /r edk2\Build %%f in (*.efi) do (
+            echo Found %%f
+            copy "%%f" artifact\
+        )
+
+    - name: Upload EFI
+      uses: actions/upload-artifact@v4
+      with:
+        name: PIXEL-EFI
+        path: artifact
