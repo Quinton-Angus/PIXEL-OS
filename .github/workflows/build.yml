@@ -1,17 +1,21 @@
-name: Build PIXEL EFI
+name: Build PIXEL OS
 
 on:
   push:
-    branches:
-      - main
+    branches: [ main ]
+  pull_request:
   workflow_dispatch:
 
 jobs:
   build:
-    runs-on: windows-latest
+    runs-on: windows-2022
+
+    defaults:
+      run:
+        shell: cmd
 
     steps:
-      - name: Checkout PIXEL
+      - name: Checkout PIXEL-OS
         uses: actions/checkout@v4
 
       - name: Checkout EDK II
@@ -26,52 +30,44 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install Python requirements
-        shell: cmd
+      - name: Install Python dependencies
         run: |
           cd edk2
           python -m pip install --upgrade pip
           python -m pip install -r pip-requirements.txt
 
-      - name: Setup Visual Studio 2022
+      - name: Setup MSVC
         uses: ilammy/msvc-dev-cmd@v1
         with:
           arch: x64
 
       - name: Build BaseTools
-        shell: cmd
         run: |
           cd edk2
           python BaseTools\Edk2ToolsBuild.py -t VS2022
 
       - name: Configure EDK II
-        shell: cmd
         run: |
           cd edk2
           call edksetup.bat Rebuild
 
-      - name: Copy PIXEL package
-        shell: cmd
+      - name: Copy PIXEL Package
         run: |
           xcopy PixelBootPkg edk2\PixelBootPkg /E /I /Y
 
       - name: Build PIXEL
-        shell: cmd
         run: |
           cd edk2
-          build ^
-            -a X64 ^
-            -b DEBUG ^
-            -t VS2022 ^
-            -p PixelBootPkg\PixelBoot.dsc
+          build -a X64 -b DEBUG -t VS2022 -p PixelBootPkg\PixelBoot.dsc
 
-      - name: Collect EFI
-        shell: cmd
+      - name: Find BOOTX64.EFI
         run: |
           mkdir artifact
-          for /r edk2\Build %%f in (BOOTX64.EFI) do copy "%%f" artifact\BOOTX64.EFI
+          for /r edk2\Build %%f in (BOOTX64.EFI) do (
+            copy "%%f" artifact\BOOTX64.EFI
+          )
 
-      - name: Upload EFI
+      - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: PIXEL-EFI
