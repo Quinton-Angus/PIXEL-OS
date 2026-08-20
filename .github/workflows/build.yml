@@ -16,17 +16,8 @@ jobs:
       - name: Install image build tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y xorriso squashfs-tools mtools debian-archive-keyring
-
-          # Ubuntu 24.04 ships an outdated live-build which cannot build
-          # modern Debian Bookworm images because it looks for the removed
-          # Contents-amd64.gz path. Install live-build from Debian's current
-          # repository instead.
-          sudo apt-get install -y wget gpg
-          wget -qO- https://live-build.debian.net/live-build.gpg | sudo gpg --dearmor -o /usr/share/keyrings/live-build.gpg
-          echo "deb [signed-by=/usr/share/keyrings/live-build.gpg] https://live-build.debian.net/debian bookworm main" | sudo tee /etc/apt/sources.list.d/live-build.list
-          sudo apt-get update
-          sudo apt-get install -y live-build
+          sudo apt-get install -y live-build xorriso squashfs-tools mtools debootstrap debian-archive-keyring
+          lb --version
 
       - name: Configure Debian live image
         run: |
@@ -45,9 +36,6 @@ jobs:
             --bootappend-live "boot=live components" \
             --apt-recommends true
 
-          # live-build's legacy --security option generates the obsolete
-          # Bookworm "bookworm/updates" repository. Add the current Debian
-          # security suite explicitly instead.
           mkdir -p config/archives
           cat > config/archives/security.list.chroot <<'EOF'
           deb https://deb.debian.org/debian-security bookworm-security main contrib non-free-firmware
@@ -57,6 +45,7 @@ jobs:
         run: |
           mkdir -p config/package-lists
           cat > config/package-lists/pixel.list.chroot <<'EOF'
+          linux-image-amd64
           systemd
           dbus
           xorg
@@ -126,6 +115,7 @@ jobs:
 
       - name: Upload PIXEL OS USB image
         uses: actions/upload-artifact@v4
+      
         with:
           name: PIXEL-OS-USB
           path: artifact/
