@@ -7,69 +7,101 @@ on:
 
 jobs:
   build:
-    runs-on: windows-2022
-
-    defaults:
-      run:
-        shell: cmd
-
-    env:
-      PACKAGES_PATH: ${{ github.workspace }}\edk2
+    runs-on: ubuntu-24.04
 
     steps:
+      - name: Checkout PIXEL-OS
+        uses: actions/checkout@v4
 
-    - name: Checkout PIXEL-OS
-      uses: actions/checkout@v4
+      - name: Install image build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y live-build xorriso squashfs-tools mtools
 
-    - name: Checkout EDK II
-      uses: actions/checkout@v4
-      with:
-        repository: tianocore/edk2
-        path: edk2
-        submodules: recursive
-        fetch-depth: 0
+      - name: Configure Debian live image
+        run: |
+          lb config \
+            --distribution bookworm \
+            --architectures amd64 \
+            --archive-areas "main contrib non-free-firmware" \
+            --binary-images iso-hybrid \
+            --debian-installer false \
+            --bootappend-live "boot=live components" \
+            --apt-recommends true
 
-    - name: Setup Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: "3.12"
+      - name: Configure PIXEL OS packages
+        run: |
+          mkdir -p config/package-lists
+          cat > config/package-lists/pixel.list.chroot <<'EOF'
+          systemd
+          dbus
+          xorg
+          xserver-xorg-video-all
+          lightdm
+          openbox
+          nodejs
+          npm
+          git
+          curl
+          ca-certificates
+          fonts-dejavu
+          EOF
 
-    - name: Install Python Requirements
-      working-directory: edk2
-      run: |
-        python -m pip install --upgrade pip
-        python -m pip install -r pip-requirements.txt
+      - name: Install PIXEL shell into image
+        run: |
+          mkdir -p config/includes.chroot/opt/pixel-shell
+          cp -a shell/. config/includes.chroot/opt/pixel-shell/
+          mkdir -p config/includes.chroot/etc/lightdm
+          cat > config/includes.chroot/etc/lightdm/lightdm.conf <<'EOF'
+          [Seat:*]
+          autologin-user=pixel
+          autologin-session=pixel
+          user-session=pixel
+          EOF
 
-    - name: Setup MSVC
-      uses: ilammy/msvc-dev-cmd@v1
-      with:
-        arch: x64
+          mkdir -p config/includes.chroot/usr/share/xsessions
+          cat > config/includes.chroot/usr/share/xsessions/pixel.desktop <<'EOF'
+          [Desktop Entry]
+          Name=PIXEL OS
+          Comment=PIXEL OS Electron desktop
+          Exec=/usr/local/bin/pixel-session
+          Type=Application
+          EOF
 
-    - name: Build BaseTools
-      working-directory: edk2
-      run: |
-        python BaseTools\Edk2ToolsBuild.py -t VS2022
+          mkdir -p config/includes.chroot/usr/local/bin
+          cat > config/includes.chroot/usr/local/bin/pixel-session <<'EOF'
+          #!/bin/sh
+          openbox-session &
+          sleep 1
+          exec /opt/pixel-shell/node_modules/electron/dist/electron /opt/pixel-shell --no-sandbox --disable-gpu-sandbox
+          EOF
+          chmod +x config/includes.chroot/usr/local/bin/pixel-session
 
-    - name: Configure EDK II
-      working-directory: edk2
-      run: |
-        call edksetup.bat Rebuild
+      - name: Configure image setup
+        run: |
+          mkdir -p config/hooks/live
+          cat > config/hooks/live/0100-pixel.hook.chroot <<'EOF'
+          #!/bin/sh
+          set -e
+          useradd -m -s /bin/bash pixel || true
+          usermod -aG audio,video,input pixel || true
+          chown -R pixel:pixel /opt/pixel-shell
+          cd /opt/pixel-shell
+          npm install --no-audit --no-fund
+          systemctl enable lightdm.service
+          systemctl set-default graphical.target
+          EOF
+          chmod +x config/hooks/live/0100-pixel.hook.chroot
 
-    - name: Build EDK II baseline
-      working-directory: edk2
-      run: |
-        build -a X64 -b DEBUG -t VS2022 -p MdeModulePkg\MdeModulePkg.dsc
+      - name: Build bootable USB image
+        run: |
+          sudo lb build
+          mkdir -p artifact
+          cp live-image-amd64.hybrid.iso artifact/PIXEL-OS-USB.iso
+          sha256sum artifact/PIXEL-OS-USB.iso > artifact/PIXEL-OS-USB.iso.sha256
 
-    - name: Collect EFI Files
-      run: |
-        mkdir artifact
-        for /r edk2\Build %%f in (*.efi) do (
-          echo Found %%f
-          copy "%%f" artifact\
-        )
-
-    - name: Upload EFI
-      uses: actions/upload-artifact@v4
-      with:
-        name: PIXEL-EFI
-        path: artifact
+      - name: Upload PIXEL OS USB image
+        uses: actions/upload-artifact@v4
+        with:
+          name: PIXEL-OS-USB
+          path: artifact/
