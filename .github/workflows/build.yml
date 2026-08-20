@@ -16,14 +16,21 @@ jobs:
       - name: Install image build tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y live-build xorriso squashfs-tools mtools
+          sudo apt-get install -y live-build xorriso squashfs-tools mtools debian-archive-keyring
 
       - name: Configure Debian live image
         run: |
+          lb clean --purge || true
           lb config \
+            --mode debian \
             --distribution bookworm \
             --architectures amd64 \
             --archive-areas "main contrib non-free-firmware" \
+            --mirror-bootstrap https://deb.debian.org/debian \
+            --mirror-chroot https://deb.debian.org/debian \
+            --mirror-binary https://deb.debian.org/debian \
+            --security true \
+            --mirror-binary-security https://deb.debian.org/debian-security \
             --binary-images iso-hybrid \
             --debian-installer false \
             --bootappend-live "boot=live components" \
