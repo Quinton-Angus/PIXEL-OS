@@ -8,8 +8,6 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    container:
-      image: debian:bookworm
 
     steps:
       - name: Checkout PIXEL-OS
@@ -17,8 +15,17 @@ jobs:
 
       - name: Install image build tools
         run: |
-          apt-get update
-          apt-get install -y live-build debootstrap xorriso squashfs-tools mtools debian-archive-keyring ca-certificates git curl npm nodejs
+          sudo apt-get update
+          sudo apt-get install -y \
+            live-build \
+            debootstrap \
+            xorriso \
+            squashfs-tools \
+            mtools \
+            grub-pc-bin \
+            grub-efi-amd64-bin \
+            grub-efi-amd64-signed \
+            shim-signed
           lb --version
 
       - name: Configure Debian live image
@@ -105,7 +112,7 @@ jobs:
 
       - name: Build bootable USB image
         run: |
-          lb build
+          sudo lb build
           mkdir -p artifact
           cp live-image-amd64.hybrid.iso artifact/PIXEL-OS-USB.iso
           sha256sum artifact/PIXEL-OS-USB.iso > artifact/PIXEL-OS-USB.iso.sha256
