@@ -28,6 +28,7 @@ jobs:
             --archive-areas "main contrib non-free-firmware" \
             --mirror-bootstrap https://deb.debian.org/debian \
             --mirror-chroot https://deb.debian.org/debian \
+            --mirror-chroot-security https://deb.debian.org/debian-security \
             --mirror-binary https://deb.debian.org/debian \
             --security true \
             --mirror-binary-security https://deb.debian.org/debian-security \
