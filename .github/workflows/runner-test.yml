@@ -1,0 +1,17 @@
+name: Runner Queue Test
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  runner-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Runner online test
+        run: |
+          echo "PIXEL OS runner test"
+          echo "Runner: $RUNNER_NAME"
+          echo "OS: $RUNNER_OS"
+          date -u
