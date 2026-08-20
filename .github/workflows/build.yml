@@ -39,13 +39,22 @@ jobs:
             --mirror-bootstrap https://deb.debian.org/debian \
             --mirror-chroot https://deb.debian.org/debian \
             --mirror-binary https://deb.debian.org/debian \
-            --security true \
-            --mirror-binary-security https://deb.debian.org/debian-security \
-            --mirror-chroot-security https://deb.debian.org/debian-security \
+            --security false \
             --binary-images iso-hybrid \
             --debian-installer false \
             --bootappend-live "boot=live components" \
             --apt-recommends true
+
+          # live-build 20230502 still generates the obsolete
+          # bookworm/updates security suite when --security is enabled.
+          # Define Debian's current Bookworm security suite explicitly.
+          mkdir -p config/archives
+          cat > config/archives/security.list.chroot <<'EOF'
+          deb https://deb.debian.org/debian-security bookworm-security main contrib non-free-firmware
+          EOF
+          cat > config/archives/security.list.binary <<'EOF'
+          deb https://deb.debian.org/debian-security bookworm-security main contrib non-free-firmware
+          EOF
 
       - name: Configure PIXEL OS packages
         run: |
