@@ -22,6 +22,7 @@ jobs:
             xorriso \
             squashfs-tools \
             mtools \
+            isolinux \
             grub-pc-bin \
             grub-efi-amd64-bin \
             grub-efi-amd64-signed \
@@ -54,6 +55,21 @@ jobs:
               if updated != text:
                   path.write_text(updated)
           PY
+
+          # Ubuntu's syslinux/live-build combination can leave the legacy
+          # ISOLINUX assets missing from /root/isolinux inside the build
+          # chroot. Seed the exact files live-build expects before the chroot
+          # is assembled. Without these, lb_binary_syslinux fails with:
+          #   cp: cannot stat '/root/isolinux/isolinux.bin'
+          #   cp: cannot stat '/root/isolinux/vesamenu.c32'
+          mkdir -p config/includes.chroot/root/isolinux
+          sudo install -m 0644 /usr/lib/ISOLINUX/isolinux.bin \
+            config/includes.chroot/root/isolinux/isolinux.bin
+          sudo install -m 0644 /usr/lib/syslinux/modules/bios/vesamenu.c32 \
+            config/includes.chroot/root/isolinux/vesamenu.c32
+
+          test -s config/includes.chroot/root/isolinux/isolinux.bin
+          test -s config/includes.chroot/root/isolinux/vesamenu.c32
 
       - name: Configure Debian live image
         run: |
