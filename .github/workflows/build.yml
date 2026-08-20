@@ -31,10 +31,19 @@ jobs:
           # Ubuntu's packaged live-build currently contains an old Contents
           # index URL. Debian now publishes the architecture Contents index
           # under the archive component (main/Contents-amd64.gz).
-          sudo sed -i \
-            's#${LB_PARENT_MIRROR_CHROOT}/dists/${LB_PARENT_DISTRIBUTION}/Contents-${LB_ARCHITECTURES}.gz#${LB_PARENT_MIRROR_CHROOT}/dists/${LB_PARENT_DISTRIBUTION}/main/Contents-${LB_ARCHITECTURES}.gz#g; \
-             s#${LB_MIRROR_CHROOT}/dists/${LB_DISTRIBUTION}/Contents-${LB_ARCHITECTURES}.gz#${LB_MIRROR_CHROOT}/dists/${LB_DISTRIBUTION}/main/Contents-${LB_ARCHITECTURES}.gz#g' \
-            /usr/lib/live/build/lb_chroot_linux-image
+          sudo python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('/usr/lib/live/build/lb_chroot_linux-image')
+          text = path.read_text()
+          replacements = {
+              '${LB_PARENT_MIRROR_CHROOT}/dists/${LB_PARENT_DISTRIBUTION}/Contents-${LB_ARCHITECTURES}.gz': '${LB_PARENT_MIRROR_CHROOT}/dists/${LB_PARENT_DISTRIBUTION}/main/Contents-${LB_ARCHITECTURES}.gz',
+              '${LB_MIRROR_CHROOT}/dists/${LB_DISTRIBUTION}/Contents-${LB_ARCHITECTURES}.gz': '${LB_MIRROR_CHROOT}/dists/${LB_DISTRIBUTION}/main/Contents-${LB_ARCHITECTURES}.gz',
+          }
+          for old, new in replacements.items():
+              text = text.replace(old, new)
+          path.write_text(text)
+          PY
 
       - name: Configure Debian live image
         run: |
