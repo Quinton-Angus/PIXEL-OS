@@ -57,7 +57,7 @@ jobs:
 
     - name: Copy PixelBootPkg
       run: |
-        xcopy PixelBootPkg edk2\PixelBootPkg /E /I /Y
+        xcopy "%GITHUB_WORKSPACE%\PixelBootPkg" "%GITHUB_WORKSPACE%\edk2\PixelBootPkg" /E /I /Y
 
     - name: Register PixelBoot
       working-directory: edk2
