@@ -28,21 +28,31 @@ jobs:
             shim-signed
           lb --version
 
-          # Ubuntu's packaged live-build currently contains an old Contents
-          # index URL. Debian now publishes the architecture Contents index
-          # under the archive component (main/Contents-amd64.gz).
+          # Ubuntu's packaged live-build uses an outdated Contents index path
+          # and the old Debian security suite name. Patch both before lb config.
           sudo python3 - <<'PY'
           from pathlib import Path
 
-          path = Path('/usr/lib/live/build/lb_chroot_linux-image')
-          text = path.read_text()
+          root = Path('/usr/lib/live/build')
           replacements = {
-              '${LB_PARENT_MIRROR_CHROOT}/dists/${LB_PARENT_DISTRIBUTION}/Contents-${LB_ARCHITECTURES}.gz': '${LB_PARENT_MIRROR_CHROOT}/dists/${LB_PARENT_DISTRIBUTION}/main/Contents-${LB_ARCHITECTURES}.gz',
-              '${LB_MIRROR_CHROOT}/dists/${LB_DISTRIBUTION}/Contents-${LB_ARCHITECTURES}.gz': '${LB_MIRROR_CHROOT}/dists/${LB_DISTRIBUTION}/main/Contents-${LB_ARCHITECTURES}.gz',
+              '/dists/${LB_PARENT_DISTRIBUTION}/Contents-${LB_ARCHITECTURES}.gz': '/dists/${LB_PARENT_DISTRIBUTION}/main/Contents-${LB_ARCHITECTURES}.gz',
+              '/dists/${LB_DISTRIBUTION}/Contents-${LB_ARCHITECTURES}.gz': '/dists/${LB_DISTRIBUTION}/main/Contents-${LB_ARCHITECTURES}.gz',
+              '${LB_PARENT_DISTRIBUTION}/updates': '${LB_PARENT_DISTRIBUTION}-security',
+              '${LB_DISTRIBUTION}/updates': '${LB_DISTRIBUTION}-security',
           }
-          for old, new in replacements.items():
-              text = text.replace(old, new)
-          path.write_text(text)
+
+          for path in root.rglob('*'):
+              if not path.is_file():
+                  continue
+              try:
+                  text = path.read_text()
+              except (UnicodeDecodeError, PermissionError):
+                  continue
+              updated = text
+              for old, new in replacements.items():
+                  updated = updated.replace(old, new)
+              if updated != text:
+                  path.write_text(updated)
           PY
 
       - name: Configure Debian live image
