@@ -55,30 +55,14 @@ jobs:
       run: |
         call edksetup.bat Rebuild
 
-    - name: Copy PixelBootPkg
-      run: |
-        xcopy "%GITHUB_WORKSPACE%\PixelBootPkg" "%GITHUB_WORKSPACE%\edk2\PixelBootPkg" /E /I /Y
-
-    - name: Register PixelBoot
+    - name: Build EDK II baseline
       working-directory: edk2
       run: |
-        powershell -NoProfile -Command "$p='MdeModulePkg\MdeModulePkg.dsc'; $c=Get-Content $p -Raw; if ($c -notmatch '(?m)^\s*PixelBootPkg/PixelBoot\.inf\s*$') { $c=$c -replace '(?ms)(^\[Components\]\r?\n)', '$1PixelBootPkg/PixelBoot.inf`r`n'; Set-Content -Path $p -Value $c -NoNewline }"
-
-    - name: Build
-      working-directory: edk2
-      run: |
-        call edksetup.bat Rebuild
-
-        build ^
-          -a X64 ^
-          -b DEBUG ^
-          -t VS2022 ^
-          -p MdeModulePkg\MdeModulePkg.dsc
+        build -a X64 -b DEBUG -t VS2022 -p MdeModulePkg\MdeModulePkg.dsc
 
     - name: Collect EFI Files
       run: |
         mkdir artifact
-
         for /r edk2\Build %%f in (*.efi) do (
           echo Found %%f
           copy "%%f" artifact\
