@@ -7,7 +7,7 @@ on:
 
 jobs:
   build:
-    runs-on: debian:bookworm
+    runs-on: ubuntu-latest
     container:
       image: debian:bookworm
 
@@ -18,18 +18,7 @@ jobs:
       - name: Install image build tools
         run: |
           apt-get update
-          apt-get install -y \
-            live-build \
-            debootstrap \
-            xorriso \
-            squashfs-tools \
-            mtools \
-            debian-archive-keyring \
-            ca-certificates \
-            git \
-            curl \
-            npm \
-            nodejs
+          apt-get install -y live-build debootstrap xorriso squashfs-tools mtools debian-archive-keyring ca-certificates git curl npm nodejs
           lb --version
 
       - name: Configure Debian live image
@@ -74,7 +63,6 @@ jobs:
         run: |
           mkdir -p config/includes.chroot/opt/pixel-shell
           cp -a shell/. config/includes.chroot/opt/pixel-shell/
-
           mkdir -p config/includes.chroot/etc/lightdm
           cat > config/includes.chroot/etc/lightdm/lightdm.conf <<'EOF'
           [Seat:*]
@@ -82,7 +70,6 @@ jobs:
           autologin-session=pixel
           user-session=pixel
           EOF
-
           mkdir -p config/includes.chroot/usr/share/xsessions
           cat > config/includes.chroot/usr/share/xsessions/pixel.desktop <<'EOF'
           [Desktop Entry]
@@ -91,7 +78,6 @@ jobs:
           Exec=/usr/local/bin/pixel-session
           Type=Application
           EOF
-
           mkdir -p config/includes.chroot/usr/local/bin
           cat > config/includes.chroot/usr/local/bin/pixel-session <<'EOF'
           #!/bin/sh
