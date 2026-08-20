@@ -56,20 +56,13 @@ jobs:
                   path.write_text(updated)
           PY
 
-          # Ubuntu's syslinux/live-build combination can leave the legacy
-          # ISOLINUX assets missing from /root/isolinux inside the build
-          # chroot. Seed the exact files live-build expects before the chroot
-          # is assembled. Without these, lb_binary_syslinux fails with:
-          #   cp: cannot stat '/root/isolinux/isolinux.bin'
-          #   cp: cannot stat '/root/isolinux/vesamenu.c32'
-          mkdir -p config/includes.chroot/root/isolinux
-          sudo install -m 0644 /usr/lib/ISOLINUX/isolinux.bin \
-            config/includes.chroot/root/isolinux/isolinux.bin
-          sudo install -m 0644 /usr/lib/syslinux/modules/bios/vesamenu.c32 \
-            config/includes.chroot/root/isolinux/vesamenu.c32
-
-          test -s config/includes.chroot/root/isolinux/isolinux.bin
-          test -s config/includes.chroot/root/isolinux/vesamenu.c32
+          # live-build's binary syslinux stage expects these legacy assets in
+          # /root/isolinux on the BUILD HOST, not inside the chroot includes.
+          sudo mkdir -p /root/isolinux
+          sudo install -m 0644 /usr/lib/ISOLINUX/isolinux.bin /root/isolinux/isolinux.bin
+          sudo install -m 0644 /usr/lib/syslinux/modules/bios/vesamenu.c32 /root/isolinux/vesamenu.c32
+          sudo test -s /root/isolinux/isolinux.bin
+          sudo test -s /root/isolinux/vesamenu.c32
 
       - name: Configure Debian live image
         run: |
